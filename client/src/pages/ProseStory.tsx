@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PoemCard } from "@/components/PoemCard";
 import { ArrowLeft, BookOpen, Eye } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, fetchStaticData } from "@/lib/queryClient";
 import type { Prose, Poem } from "@shared/schema";
 
 export default function ProseStory() {
@@ -15,12 +15,22 @@ export default function ProseStory() {
   const proseId = params?.id;
 
   const { data: prose, isLoading } = useQuery<Prose>({
-    queryKey: ["/api/prose", proseId],
+    queryKey: ["prose", proseId],
+    queryFn: async () => {
+      const allProse = await fetchStaticData<Prose[]>("/data/prose.json");
+      const found = allProse.find((p) => p.id === proseId);
+      if (!found) throw new Error("Story not found");
+      return found;
+    },
     enabled: !!proseId,
   });
 
   const { data: relatedPoem } = useQuery<Poem>({
-    queryKey: ["/api/poems", prose?.relatedPoemId],
+    queryKey: ["poems", prose?.relatedPoemId],
+    queryFn: async () => {
+      const allPoems = await fetchStaticData<Poem[]>("/data/poems.json");
+      return allPoems.find((p) => p.id === prose?.relatedPoemId) || null as any;
+    },
     enabled: !!prose?.relatedPoemId,
   });
 
@@ -61,7 +71,7 @@ export default function ProseStory() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#faf8f5] dark:bg-[#1a1614] prose-story-page">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -87,7 +97,7 @@ export default function ProseStory() {
         {/* Back Button */}
         <Button
           variant="ghost"
-          className="mb-8"
+          className="mb-8 border-[1px] border-[#b8935f]/30 dark:border-[#b8935f]/30 hover:bg-[#a88860]/5 transition-all duration-300 text-[#a88860] dark:text-[#b8935f]"
           onClick={() => window.location.href = "/prose"}
           data-testid="button-back"
         >
@@ -97,16 +107,16 @@ export default function ProseStory() {
 
         {/* Title and Metadata */}
         <div className="mb-12">
-          <h1 className="font-display text-4xl md:text-5xl font-bold mb-4" data-testid="text-prose-title">
+          <h1 className="font-display text-4xl md:text-5xl font-bold mb-4 text-[#1a1614] dark:text-white" data-testid="text-prose-title">
             {prose.title}
           </h1>
           
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex gap-2">
-              <Badge variant="secondary">{prose.theme}</Badge>
-              <Badge variant="outline">{prose.mood}</Badge>
+              <Badge className="bg-[#a88860] dark:bg-[#b8935f] text-white border-0">{prose.theme}</Badge>
+              <Badge variant="outline" className="border-[#b8935f]/30 dark:border-[#b8935f]/30 text-[#a88860] dark:text-[#b8935f] border-[1px]">{prose.mood}</Badge>
             </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-4 text-sm text-[#a88860] dark:text-[#b8935f]">
               <span className="flex items-center gap-1">
                 <BookOpen className="w-4 h-4" />
                 {prose.readingTime} min read
@@ -124,12 +134,12 @@ export default function ProseStory() {
           {/* Philosophy Column */}
           <div className="space-y-6">
             <div className="sticky top-24">
-              <div className="bg-secondary/20 border-l-4 border-secondary p-6 rounded-lg ring-1 ring-secondary/30 dark:bg-secondary/15">
-                <h2 className="font-display text-2xl font-semibold mb-4 text-secondary-foreground">
+              <div className="bg-transparent border-l-2 border-[#a88860] dark:border-[#b8935f] p-6">
+                <h2 className="font-display text-2xl font-semibold mb-4 text-[#1a1614] dark:text-white">
                   The Philosophy
                 </h2>
                 <div 
-                  className="prose prose-lg max-w-none leading-relaxed whitespace-pre-wrap text-foreground"
+                  className="prose prose-lg max-w-none leading-relaxed whitespace-pre-wrap text-[#3d3935] dark:text-[#e5e1dc]"
                   data-testid="text-philosophy-content"
                 >
                   {prose.philosophyContent}
@@ -141,11 +151,11 @@ export default function ProseStory() {
           {/* Narrative Column */}
           <div className="space-y-6">
             <div>
-              <h2 className="font-display text-2xl font-semibold mb-4">
+              <h2 className="font-display text-2xl font-semibold mb-4 text-[#1a1614] dark:text-white">
                 The Story
               </h2>
               <div 
-                className="prose prose-lg max-w-none leading-relaxed whitespace-pre-wrap"
+                className="prose prose-lg max-w-none leading-relaxed whitespace-pre-wrap text-[#3d3935] dark:text-[#e5e1dc]"
                 data-testid="text-narrative-content"
               >
                 {prose.narrativeContent}
@@ -156,8 +166,8 @@ export default function ProseStory() {
 
         {/* Related Poem */}
         {relatedPoem && (
-          <div className="mt-16 pt-8 border-t border-border">
-            <h3 className="font-display text-2xl font-semibold mb-6">
+          <div className="mt-16 pt-8 border-t border-[#b8935f]/10 dark:border-[#b8935f]/10">
+            <h3 className="font-display text-2xl font-semibold mb-6 text-[#1a1614] dark:text-white">
               Related Poem
             </h3>
             <div className="max-w-md">
@@ -170,16 +180,24 @@ export default function ProseStory() {
         )}
 
         {/* Reflection Prompt */}
-        <Card className="mt-16 p-8 bg-muted/30">
-          <h3 className="font-display text-xl font-semibold mb-3">
+        <Card className="mt-16 p-8 bg-transparent border-[1px] border-[#b8935f]/20 dark:border-[#b8935f]/20">
+          <h3 className="font-display text-xl font-semibold mb-3 text-[#1a1614] dark:text-white">
             Reflect on This
           </h3>
-          <p className="text-muted-foreground leading-relaxed">
+          <p className="text-[#3d3935] dark:text-[#e5e1dc] leading-relaxed">
             What resonated most with you in this piece? How does this philosophy 
             show up in your own life? Take a moment to contemplate before moving forward.
           </p>
         </Card>
       </div>
+      <style>{`
+        .prose-story-page a {
+          transition: color 0.3s ease;
+        }
+        .prose-story-page a:hover {
+          color: #a88860 !important;
+        }
+      `}</style>
     </div>
   );
 }
